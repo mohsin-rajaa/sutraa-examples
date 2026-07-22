@@ -1,0 +1,10 @@
+{
+  "name": "sutraa-pet-chatbot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Biscuit the puppy — a pet chatbot built on @sutraa/sdk (public API test)",
+  "dependencies": {
+    "@sutraa/sdk": "^0.4.0"
+  }
+}

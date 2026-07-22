@@ -1,0 +1,14 @@
+# dependencies
+node_modules/
+package-lock.json
+
+# vercel
+.vercel/
+
+# env / secrets
+.env
+.env.*
+
+# logs & os
+*.log
+.DS_Store

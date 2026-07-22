@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Biscuit 🐶 — a Sutraa pet chatbot</title>
+  <style>
+    :root {
+      --bg: #fff7ee;
+      --panel: #ffffff;
+      --ink: #3b2f2a;
+      --muted: #9c8b7f;
+      --accent: #e8912d;
+      --accent-soft: #ffe6c7;
+      --bot-bubble: #fff0dc;
+      --user-bubble: #e8912d;
+      --border: #f0e2d2;
+      --shadow: 0 10px 40px rgba(140, 96, 40, 0.12);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #211a16;
+        --panel: #2c231d;
+        --ink: #f3e9df;
+        --muted: #b09d8e;
+        --accent: #f2a24a;
+        --accent-soft: #4a3420;
+        --bot-bubble: #38291d;
+        --user-bubble: #f2a24a;
+        --border: #3d2f24;
+        --shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-rounded, "Segoe UI", -apple-system, system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 50% -10%, var(--accent-soft), var(--bg) 60%);
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .app {
+      width: 100%;
+      max-width: 480px;
+      height: min(760px, 94vh);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 26px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--accent-soft), transparent);
+    }
+    .avatar {
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 26px;
+      background: var(--panel);
+      border: 2px solid var(--accent);
+      box-shadow: 0 4px 12px rgba(232,145,45,.25);
+    }
+    header .name { font-weight: 800; font-size: 18px; letter-spacing: .2px; }
+    header .status { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #46c07a; box-shadow: 0 0 0 3px rgba(70,192,122,.2); }
+    header .spacer { flex: 1; }
+    .reset {
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      font-size: 12px; padding: 6px 10px; border-radius: 999px; cursor: pointer;
+    }
+    .reset:hover { color: var(--accent); border-color: var(--accent); }
+
+    .chat {
+      flex: 1; overflow-y: auto; padding: 18px;
+      display: flex; flex-direction: column; gap: 12px;
+      scroll-behavior: smooth;
+    }
+    .row { display: flex; gap: 8px; align-items: flex-end; max-width: 85%; }
+    .row.user { align-self: flex-end; flex-direction: row-reverse; }
+    .row .pfp { font-size: 20px; flex-shrink: 0; }
+    .bubble {
+      padding: 11px 15px; border-radius: 18px; line-height: 1.45; font-size: 15px;
+      white-space: pre-wrap; word-wrap: break-word;
+    }
+    .row.bot .bubble { background: var(--bot-bubble); border-bottom-left-radius: 6px; }
+    .row.user .bubble { background: var(--user-bubble); color: #fff; border-bottom-right-radius: 6px; }
+    .row.error .bubble { background: #fdecea; color: #b23b2e; border: 1px solid #f5c6c0; }
+
+    .typing { display: flex; gap: 4px; padding: 4px 2px; }
+    .typing span {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+      opacity: .5; animation: bounce 1.2s infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: .2s; }
+    .typing span:nth-child(3) { animation-delay: .4s; }
+    @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity:.4;} 30% { transform: translateY(-6px); opacity:1;} }
+
+    form {
+      display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--border);
+      background: var(--panel);
+    }
+    input[type=text] {
+      flex: 1; border: 1px solid var(--border); background: var(--bg); color: var(--ink);
+      border-radius: 999px; padding: 12px 16px; font-size: 15px; outline: none;
+    }
+    input[type=text]:focus { border-color: var(--accent); }
+    button.send {
+      border: none; background: var(--accent); color: #fff; width: 46px; height: 46px;
+      border-radius: 50%; font-size: 18px; cursor: pointer; flex-shrink: 0;
+      transition: transform .1s;
+    }
+    button.send:active { transform: scale(.9); }
+    button.send:disabled { opacity: .5; cursor: default; }
+    .footer-note { text-align: center; font-size: 11px; color: var(--muted); padding: 0 0 10px; }
+    .footer-note a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="avatar">🐶</div>
+      <div>
+        <div class="name">Biscuit</div>
+        <div class="status"><span class="dot"></span> good boy, online</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="reset" id="reset" title="Start a fresh conversation">new chat</button>
+    </header>
+
+    <div class="chat" id="chat"></div>
+
+    <form id="form">
+      <input type="text" id="msg" placeholder="Say hi to Biscuit…" autocomplete="off" />
+      <button class="send" id="send" type="submit" aria-label="Send">➤</button>
+    </form>
+    <div class="footer-note">powered by <a href="https://www.npmjs.com/package/@sutraa/sdk" target="_blank" rel="noopener">@sutraa/sdk</a></div>
+  </div>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("form");
+    const input = document.getElementById("msg");
+    const sendBtn = document.getElementById("send");
+    const resetBtn = document.getElementById("reset");
+    const KEY = "biscuit_session_id";
+
+    function addRow(role, text) {
+      const row = document.createElement("div");
+      row.className = "row " + role;
+      const pfp = document.createElement("div");
+      pfp.className = "pfp";
+      pfp.textContent = role === "user" ? "🧑" : role === "error" ? "⚠️" : "🐶";
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+      row.appendChild(pfp);
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      chat.scrollTop = chat.scrollHeight;
+      return bubble;
+    }
+
+    function addTyping() {
+      const row = document.createElement("div");
+      row.className = "row bot";
+      row.id = "typing-row";
+      row.innerHTML = '<div class="pfp">🐶</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+      chat.appendChild(row);
+      chat.scrollTop = chat.scrollHeight;
+    }
+    function removeTyping() {
+      const t = document.getElementById("typing-row");
+      if (t) t.remove();
+    }
+
+    async function send(message) {
+      addRow("user", message);
+      input.value = "";
+      sendBtn.disabled = true;
+      addTyping();
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            message,
+            sessionId: localStorage.getItem(KEY) || undefined,
+          }),
+        });
+        const data = await res.json();
+        removeTyping();
+        if (!res.ok) {
+          addRow("error", data.error || "Something went wrong.");
+        } else {
+          if (data.sessionId) localStorage.setItem(KEY, data.sessionId);
+          addRow("bot", data.reply || "*tilts head* …woof?");
+        }
+      } catch (e) {
+        removeTyping();
+        addRow("error", "Couldn't reach Biscuit. Check your connection.");
+      } finally {
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const message = input.value.trim();
+      if (message) send(message);
+    });
+
+    resetBtn.addEventListener("click", () => {
+      localStorage.removeItem(KEY);
+      chat.innerHTML = "";
+      greet();
+    });
+
+    function greet() {
+      addRow("bot", "Woof! I'm Biscuit 🐾 Ask me anything, or just say hi!");
+    }
+    greet();
+    input.focus();
+  </script>
+</body>
+</html>

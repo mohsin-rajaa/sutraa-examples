@@ -16,7 +16,7 @@ await chat.generate({ input: "My name is Mohsin" });
 await chat.generate({ input: "What's my name?" }); // → "Mohsin"
 ```
 
-Each folder in this repo is a **self-contained, runnable project** — clone it, deploy it, read the code. They're meant as honest, from-the-README references for what building on Sutraa actually looks like.
+Each folder in this repo is a **self-contained, runnable project** — clone it, deploy it, read the code. Together they cover the SDK's core patterns: keyless usage, conversation memory, vision, authenticated (pro-tier) configuration, and multi-tenant client management.
 
 ## Examples
 

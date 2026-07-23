@@ -1,26 +1,24 @@
 # 🏢 Multi-Tenant SaaS Demo
 
-A small "summarize text on behalf of a customer" SaaS, built to showcase the exact multi-tenant pattern from the [**@sutraa/sdk**](https://www.npmjs.com/package/@sutraa/sdk) README:
+A "summarize text on behalf of a customer" application built to demonstrate the multi-tenant pattern documented by [**@sutraa/sdk**](https://www.npmjs.com/package/@sutraa/sdk):
 
 ```ts
 const sutraa = new SutraaClient();           // keyless free tier
 const pro = new SutraaClient({ apiKey });    // pro
 ```
 
-Three demo tenants, two plans, one shared API route — each tenant gets its own `SutraaClient` instance.
+Three demo tenants across two plans, served by one API route — each tenant resolves to its own `SutraaClient` instance.
 
 **Live demo → [multi-tenant-saas-zeta.vercel.app](https://multi-tenant-saas-zeta.vercel.app)**
 
-> Note the `-zeta` suffix: `multi-tenant-saas.vercel.app` was already claimed by an unrelated project (the `.vercel.app` namespace is global, not per-account), and Vercel silently assigned this alias instead. Worth checking your actual assigned domain after a first deploy rather than assuming `<project-name>.vercel.app`.
+## Overview
 
-## What it demonstrates
+- **Per-tenant client instances**, constructed once and cached in a `Map<tenantId, SutraaClient>`, rather than recreated on every request.
+- **Mixed plans in a single deployment**: `acme` runs on the pro tier via an API key; `hobby` and `beta` run on the keyless free tier.
+- **Server-only secrets**: the API key never reaches the browser — read from `process.env.SUTRAA_API_KEY`, stored as a Vercel Sensitive environment variable, same as [`reasoning-explorer`](../reasoning-explorer).
+- **Per-tenant error context**: failed requests include `tenantId` and `plan` alongside the SDK's typed error fields, so a real application can route retries, alerting, or billing logic per tenant.
 
-- **Per-tenant `SutraaClient` instances**, built once and cached (`Map<tenantId, SutraaClient>`), not recreated per request.
-- **Mixed plans in one app**: `acme` (pro, uses the platform's API key) alongside `hobby` and `beta` (both keyless free tier).
-- **The API key never reaches the browser** — same discipline as [`reasoning-explorer`](../reasoning-explorer): read from `process.env.SUTRAA_API_KEY`, stored as an encrypted, *Sensitive* Vercel env var.
-- **Typed errors per tenant** — the route attaches `tenantId`/`plan` to error responses so a real app could route retries, alerting, or billing logic per tenant.
-
-## Structure
+## Project structure
 
 ```
 multi-tenant-saas/
@@ -28,10 +26,10 @@ multi-tenant-saas/
 ├── api/
 │   └── summarize.js       # tenant lookup → cached SutraaClient → text.generate
 └── public/
-    └── index.html          # tenant picker + summarizer + per-session usage counts
+    └── index.html           # tenant picker + summarizer + usage counts
 ```
 
-## How it works
+## Implementation
 
 ```js
 import { SutraaClient } from "@sutraa/sdk";
@@ -56,17 +54,22 @@ function clientFor(tenantId) {
 const res = await clientFor(tenantId).text.generate({ task: "summarize", input: text });
 ```
 
-## Run locally / deploy your own copy
+Caching clients by tenant avoids re-establishing device identity or re-parsing configuration on every request, and keeps each tenant's calls attributable to the correct plan.
+
+## Setup & deployment
 
 ```sh
 npm install
-vercel env add SUTRAA_API_KEY production   # your own key, for the pro tenant — never commit it
+vercel env add SUTRAA_API_KEY production   # your own key, for the pro tenant
 vercel deploy --prod
 ```
 
-## Notes from testing
+**Deployment note:** `*.vercel.app` subdomains are allocated globally across all Vercel accounts, not per-project. If your chosen project name is already taken, Vercel assigns a suffixed alias automatically (e.g. `my-app-zeta.vercel.app`). After your first deploy, confirm the actual assigned domain with `vercel ls` rather than assuming `<project-name>.vercel.app`.
 
-- All three tenants worked correctly, including two separate free-tier tenants running through the same keyless client concurrently — confirming tenant routing itself is just app-level logic, it doesn't require per-tenant credentials to function.
-- **The free-tier quota we exhausted while testing [`vision-scanner`](../vision-scanner) had already reset** by the time this project was tested (a few hours later) — so it's a rolling/short window, not a hard lockout.
-- Hit one transient `upstream_timeout` typed error on a free-tier call; an immediate retry succeeded. Worth building simple retry logic around calls in production, same as you would for any upstream LLM API.
-- **Caveat worth knowing:** on the keyless free tier, limits are enforced "per device and per network" per the SDK docs — so two free-tier tenants served by the *same backend* likely share one underlying quota bucket, even though this demo tracks their usage separately at the app level. Real per-tenant isolation (so one noisy free tenant can't exhaust another's limit) requires giving each tenant its own API key, the way `acme` has here.
+## Production considerations
+
+**Tenant isolation.** The free tier's limits are enforced per device/network, not per logical tenant. Two free-tier tenants served by the same backend share one underlying quota — this demo tracks their usage separately at the application level for visibility, but that is attribution, not isolation. For tenants that need guaranteed, independent limits, provision a dedicated API key per tenant, the way `acme` has here.
+
+**Transient failures.** Upstream calls can occasionally fail with a typed, retryable error (e.g. `upstream_timeout`). Wrap calls in retry-with-backoff logic rather than surfacing a single failed attempt directly to the end user — this is standard practice for any upstream LLM integration, not specific to Sutraa.
+
+**Quota windows.** Rate limits and quotas reset on a rolling basis rather than persisting indefinitely once hit. Don't treat a `quota_exceeded` response as a permanent state in your application logic — surface it to the user as temporary, and retry later rather than disabling the feature outright.

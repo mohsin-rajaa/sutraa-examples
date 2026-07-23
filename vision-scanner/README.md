@@ -1,27 +1,29 @@
 # 🖼️ Vision Scanner
 
-An image describe + OCR tool built on [**@sutraa/sdk**](https://www.npmjs.com/package/@sutraa/sdk)'s `vision.analyze()`. Paste any public image URL, and get either a natural-language description or extracted text.
+An image-understanding tool built on [**@sutraa/sdk**](https://www.npmjs.com/package/@sutraa/sdk)'s `vision.analyze()`. Paste any public image URL to get a natural-language description or extracted text (OCR).
 
 **Live demo → [vision-scanner-ten.vercel.app](https://vision-scanner-ten.vercel.app)**
 
-## What it demonstrates
+## Overview
 
-- **`vision.analyze({ image: { url }, task })`** — the two documented tasks, `vision.describe` and `vision.ocr`, side by side in one UI.
-- **Keyless free tier** — same zero-config flow as [`pet-chatbot`](../pet-chatbot), no API key.
-- **Typed errors** — the API route surfaces the SDK's stable `code` + `requestId` on failure (rate limits, quota, upstream errors), rather than swallowing them.
+This example covers the `vision` capability:
 
-## Structure
+- **`vision.analyze({ image: { url }, task })`** — a single method handling both documented tasks, `vision.describe` and `vision.ocr`.
+- **Keyless free tier** — same zero-config flow as [`pet-chatbot`](../pet-chatbot).
+- **Typed error handling** — the API route forwards the SDK's stable `code` and `requestId` on failure instead of collapsing every error into a generic message, so a caller can distinguish rate limiting from a bad image URL from an upstream failure.
+
+## Project structure
 
 ```
 vision-scanner/
 ├── package.json          # one dependency: @sutraa/sdk
 ├── api/
-│   └── vision.js          # serverless POST handler → vision.analyze
+│   └── vision.js           # serverless POST handler
 └── public/
-    └── index.html          # image-URL input + describe/OCR buttons
+    └── index.html           # image-URL input + describe/OCR actions
 ```
 
-## How it works
+## Implementation
 
 ```js
 import { vision } from "@sutraa/sdk";
@@ -33,26 +35,29 @@ const res = await vision.analyze({
 res.output; // description or extracted text
 ```
 
-## Run locally
+The API route validates the URL, forwards it with the selected task, and returns `{ task, result }` on success or `{ error, code, requestId }` on failure.
+
+## Setup & deployment
 
 ```sh
 npm install
-npx vercel dev
-```
-
-Or deploy directly:
-
-```sh
 npx vercel deploy --prod
 ```
 
-## Gotcha found while building this (worth knowing)
+Run locally with:
 
-`image.url` has to be **directly and reliably fetchable by Sutraa's server**, not just openable in a browser. While testing this example, full-resolution **Wikimedia Commons** URLs consistently failed with a `502 upstream_error` — smaller/simpler hosts (`httpbin.org`, `dummyimage.com`, `http.cat`) worked fine, including correctly OCR'ing generated text and describing photos in detail. If your own images fail the same way, try:
+```sh
+npx vercel dev
+```
 
-- A smaller/resized version of the image (e.g. a thumbnail, not the original multi-MB file).
-- A different host — some origins appear to reject or throttle the fetch.
+## Image URL requirements
 
-This is a hosting/fetch quirk, not a bug in the SDK's API surface — `vision.analyze()` itself behaved exactly as documented once given a reachable URL.
+`image.url` must be **directly and reliably fetchable by Sutraa's server** — not merely viewable in a browser. In practice:
 
-Also note: the free tier has **both** a per-request rate limit and a **monthly token quota** — both come back as typed errors (`rate_limited`, `quota_exceeded`) with a `requestId`, so they're easy to catch and message to users.
+- Prefer a reasonably sized image (a thumbnail or resized version) over a large, original-resolution file.
+- Use a host that serves images directly without redirects, authentication, or hotlink protection. The sample images in this app (`httpbin.org`, `dummyimage.com`, `http.cat`) are chosen because they satisfy this reliably.
+- If a URL you control fails with an upstream error, first confirm it resolves to a plain image response (correct `Content-Type`, no redirect chain) before assuming the request itself is malformed.
+
+## Rate limits and quotas
+
+The free tier enforces both a per-request rate limit and a rolling token quota, surfaced as typed errors (`rate_limited`, `quota_exceeded`) with a `requestId`. Design your UI to catch these explicitly — for example, disable the action buttons and show a clear retry message rather than a raw error string.

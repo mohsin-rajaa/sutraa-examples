@@ -33,8 +33,10 @@ deep-research-agent/
 
 `deepagents` (like any LangChain tool-calling agent) needs a model that can emit structured tool calls. Sutraa's `text`/`reasoning` capabilities return plain text, not a tool-call object — so `ChatSutraa` bridges the gap:
 
-1. It renders the conversation history and an allowed-tool catalog into a single prompt, asking for **exactly one JSON decision**: either `{"tool": "<name>", "args": {...}}` or `{"tool": "finish", "args": {"answer": "..."}}`.
-2. It parses that JSON back into a LangChain `AIMessage` carrying either `tool_calls` or final `content` — the shape `deepagents` expects.
+1. It renders the conversation history and an allowed-tool catalog into a single prompt, and (with **@sutraa/sdk ≥ 0.6.0**) passes a JSON **`schema`** for the decision envelope — either `{"tool": "<name>", "args": {...}}` or `{"tool": "finish", "args": {"answer": "..."}}`. The gateway constrains the model to that shape, repairs code fences / stray prose, and recovers the decision from the reasoning trace when `.output` is empty, so `ChatSutraa` just reads the parsed `res.json`.
+2. It parses that decision back into a LangChain `AIMessage` carrying either `tool_calls` or final `content` — the shape `deepagents` expects.
+
+> **Not using a framework?** The SDK ships a built-in tool-calling loop — `sutraa.agent.run({ input, tools, maxSteps })` — that does all of the above (decide → call → observe → repeat) for you, returning `{ output, steps, usage }`. `ChatSutraa` exists specifically to plug Sutraa into LangChain/`deepagents`; for a standalone agent, reach for `agent.run` instead.
 3. Only a small, explicit set of tools is exposed (here, just `web_search`) — everything else `deepagents` binds by default (`write_todos`, filesystem, subagents) is hidden, keeping the loop short and predictable.
 
 ```js

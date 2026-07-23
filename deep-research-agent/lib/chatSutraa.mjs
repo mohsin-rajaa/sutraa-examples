@@ -146,15 +146,26 @@ export class ChatSutraa extends BaseChatModel {
     const mustFinish = priorToolResults >= this.maxToolCalls;
     const prompt = this.#buildPrompt(messages, tools, mustFinish);
 
+    // Ask for a schema-shaped decision: {"tool": "<name|finish>", "args": {...}}.
+    // @sutraa/sdk >=0.6.0 constrains the model to this envelope and returns the
+    // gateway-parsed object on `res.json` (code fences / stray prose already
+    // repaired, and recovered from the reasoning trace when `.output` is empty).
+    const decisionSchema = {
+      type: "object",
+      properties: {
+        tool: { type: "string", enum: [...this.exposeTools, "finish"] },
+        args: { type: "object" },
+      },
+      required: ["tool", "args"],
+    };
+
     const api = this.useReasoning ? this.client.reasoning : this.client.text;
-    const res = await api.generate({ input: prompt });
-    // Reasoning-tuned models tend to treat "decide + call a tool" as part of
-    // their thinking rather than a final answer: they often leave `.output`
-    // empty and put the JSON decision in `.reasoning` instead. Prefer output,
-    // fall back to reasoning.
+    const res = await api.generate(mustFinish ? { input: prompt } : { input: prompt, schema: decisionSchema });
     const raw = contentToText(res?.output || res?.reasoning || "").trim();
 
-    const parsed = extractJson(raw);
+    // Prefer the SDK's parsed structured output; fall back to local extraction
+    // for a gateway that predates structured-output support.
+    const parsed = res?.json ?? extractJson(raw);
     let toolName = parsed?.tool;
     let toolArgs = parsed?.args;
 

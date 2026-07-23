@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verify Agent — @sutraa/sdk</title>
+  <style>
+    :root {
+      --bg: #0d1013; --panel: #15191e; --ink: #edf1f5; --muted: #8a94a0;
+      --accent: #5eead4; --accent-ink: #05201b; --line: #262c33;
+      --true: #46c07a; --false: #e0605a; --partial: #f2a24a; --unverifiable: #8a94a0;
+      --shadow: 0 12px 44px rgba(0,0,0,.45);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f6f8; --panel: #fff; --ink: #171b20; --muted: #667080;
+        --accent: #0f9c8e; --accent-ink: #fff; --line: #e4e8ee;
+        --true: #2f9e5f; --false: #d1453f; --partial: #d98324; --unverifiable: #667080;
+        --shadow: 0 12px 44px rgba(20,30,50,.08);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+      font-family: ui-sans-serif, "Segoe UI", -apple-system, system-ui, sans-serif;
+      display: flex; align-items: flex-start; justify-content: center; padding: 24px;
+    }
+    .app { width: 100%; max-width: 640px; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 20px; box-shadow: var(--shadow); padding: 26px; }
+    h1 { font-size: 20px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+    .sub { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+    .sub code { color: var(--accent); }
+
+    textarea { width: 100%; resize: vertical; min-height: 60px; background: var(--bg); color: var(--ink);
+      border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 14.5px;
+      font-family: inherit; outline: none; }
+    textarea:focus { border-color: var(--accent); }
+    .examples { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 14px; }
+    .chip { font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line);
+      background: transparent; color: var(--muted); cursor: pointer; }
+    .chip:hover { color: var(--accent); border-color: var(--accent); }
+
+    button.go { border: none; background: var(--accent); color: var(--accent-ink); border-radius: 10px;
+      padding: 12px 22px; font-size: 14px; font-weight: 700; cursor: pointer; width: 100%; }
+    button.go:disabled { opacity: .55; cursor: default; }
+
+    .status { margin-top: 14px; font-size: 12.5px; color: var(--muted); min-height: 18px; }
+    .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line);
+      border-top-color: var(--accent); animation: spin .7s linear infinite; display: inline-block; vertical-align: -2px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result { display: none; margin-top: 18px; }
+    .verdict-card { border-radius: 14px; padding: 16px; border: 1px solid var(--line); background: var(--bg); }
+    .verdict-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em; padding: 5px 12px; border-radius: 999px; color: #fff; }
+    .verdict-badge.true { background: var(--true); }
+    .verdict-badge.false { background: var(--false); }
+    .verdict-badge.partially-true { background: var(--partial); }
+    .verdict-badge.unverifiable { background: var(--unverifiable); }
+    .confidence { font-size: 12px; color: var(--muted); margin-left: 8px; }
+    .explanation { margin-top: 12px; font-size: 14.5px; line-height: 1.55; }
+    .verdict-sources { margin-top: 10px; font-size: 12px; }
+    .verdict-sources a { color: var(--accent); text-decoration: none; word-break: break-all; }
+
+    .mod-flag { margin-top: 12px; font-size: 12px; padding: 8px 12px; border-radius: 10px;
+      background: rgba(224,96,90,.12); color: var(--false); border: 1px solid rgba(224,96,90,.3); }
+
+    .evidence { margin-top: 16px; }
+    .evidence h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+    .ev-item { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; background: var(--bg); }
+    .ev-item .q { font-weight: 600; margin-bottom: 4px; }
+    .ev-item .a { color: var(--muted); line-height: 1.5; }
+
+    footer { margin-top: 22px; text-align: center; font-size: 11.5px; color: var(--muted); }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>🕵️ Verify Agent</h1>
+    <p class="sub">Decomposes a claim, searches for cited evidence, and returns a verdict — built only on <code>@sutraa/sdk</code>.</p>
+
+    <textarea id="claim" placeholder="Paste a claim to verify…"></textarea>
+    <div class="examples" id="examples"></div>
+    <button class="go" id="go">Verify claim</button>
+
+    <div class="status" id="status"></div>
+
+    <div class="result" id="result">
+      <div class="verdict-card">
+        <span class="verdict-badge" id="badge"></span>
+        <span class="confidence" id="confidence"></span>
+        <div class="explanation" id="explanation"></div>
+        <div class="verdict-sources" id="verdictSources"></div>
+      </div>
+      <div class="mod-flag" id="modFlag" style="display:none"></div>
+      <div class="evidence">
+        <h2>Evidence gathered</h2>
+        <div id="evidenceList"></div>
+      </div>
+    </div>
+
+    <footer>powered by <a href="https://www.npmjs.com/package/@sutraa/sdk" target="_blank" rel="noopener">@sutraa/sdk</a></footer>
+  </div>
+
+  <script>
+    const EXAMPLES = [
+      "The Eiffel Tower is taller than the Statue of Liberty.",
+      "Node.js 22 is the current LTS release.",
+      "Coffee was first discovered in Ethiopia.",
+    ];
+    const claimEl = document.getElementById("claim");
+    const goBtn = document.getElementById("go");
+    const statusEl = document.getElementById("status");
+    const resultEl = document.getElementById("result");
+    const badgeEl = document.getElementById("badge");
+    const confidenceEl = document.getElementById("confidence");
+    const explanationEl = document.getElementById("explanation");
+    const verdictSourcesEl = document.getElementById("verdictSources");
+    const modFlagEl = document.getElementById("modFlag");
+    const evidenceListEl = document.getElementById("evidenceList");
+
+    const examplesEl = document.getElementById("examples");
+    EXAMPLES.forEach((ex) => {
+      const c = document.createElement("button");
+      c.type = "button"; c.className = "chip"; c.textContent = ex.length > 42 ? ex.slice(0, 42) + "…" : ex;
+      c.title = ex; c.onclick = () => { claimEl.value = ex; claimEl.focus(); };
+      examplesEl.appendChild(c);
+    });
+
+    function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
+    function linkify(url) { return `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a>`; }
+
+    goBtn.addEventListener("click", async () => {
+      const claim = claimEl.value.trim();
+      if (!claim) { statusEl.textContent = "Paste a claim first."; return; }
+      goBtn.disabled = true;
+      resultEl.style.display = "none";
+      statusEl.innerHTML = '<span class="spinner"></span> decomposing, searching, and weighing evidence…';
+
+      try {
+        const res = await fetch("/api/verify", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claim }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          statusEl.innerHTML = `<span style="color:var(--false)">error: ${esc(data.error || "verification failed")}</span>`;
+          return;
+        }
+
+        statusEl.textContent = `checked against ${data.questions.length} sub-question${data.questions.length === 1 ? "" : "s"}`;
+
+        badgeEl.className = "verdict-badge " + data.verdict;
+        badgeEl.textContent = data.verdict.replace("-", " ");
+        confidenceEl.textContent = data.confidence != null ? `${data.confidence}% confidence` : "";
+        explanationEl.textContent = data.explanation;
+        verdictSourcesEl.innerHTML = (data.sources || []).map(linkify).join(" · ");
+
+        if (data.moderation?.flagged) {
+          modFlagEl.style.display = "block";
+          modFlagEl.textContent = `⚠ This claim also tripped content moderation: ${(data.moderation.categories || []).join(", ") || "flagged"}`;
+        } else {
+          modFlagEl.style.display = "none";
+        }
+
+        evidenceListEl.innerHTML = "";
+        (data.evidence || []).forEach((e) => {
+          const item = document.createElement("div");
+          item.className = "ev-item";
+          item.innerHTML = `<div class="q">${esc(e.question)}</div><div class="a">${e.answer ? esc(e.answer) : "(no evidence found)"}</div>`;
+          evidenceListEl.appendChild(item);
+        });
+
+        resultEl.style.display = "block";
+      } catch (e) {
+        statusEl.innerHTML = '<span style="color:var(--false)">Couldn\'t reach the agent.</span>';
+      } finally {
+        goBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

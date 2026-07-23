@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/research.mjs": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/@langchain/langgraph-sdk/dist/node_modules/**"
+    }
+  }
+}

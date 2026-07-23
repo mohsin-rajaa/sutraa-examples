@@ -26,6 +26,7 @@ Each folder in this repo is a **self-contained, runnable project** — clone it,
 | [`vision-scanner`](./vision-scanner) | Describe or OCR any public image URL using `vision.analyze`. Same zero-config deploy pattern, surfaces the SDK's typed errors (rate limit / quota / upstream). | [vision-scanner-ten.vercel.app](https://vision-scanner-ten.vercel.app) |
 | [`reasoning-explorer`](./reasoning-explorer) | Step-by-step thinking trace via `reasoning.generate`, on the **pro tier** — `SutraaClient({ apiKey })` with the key held only as an encrypted Vercel env var, never in the repo. | [reasoning-explorer.vercel.app](https://reasoning-explorer.vercel.app) |
 | [`multi-tenant-saas`](./multi-tenant-saas) | A mini SaaS with 3 tenants on mixed plans — one **pro** `SutraaClient` (API key), two **keyless free**. Shows cached per-tenant client instances and the multi-tenant pattern the SDK docs describe. | [multi-tenant-saas-zeta.vercel.app](https://multi-tenant-saas-zeta.vercel.app) |
+| [`deep-research-agent`](./deep-research-agent) | A [`deepagents`](https://www.npmjs.com/package/deepagents) (LangChain) research agent powered end-to-end by Sutraa — `reasoning.generate` as the model, `search.web` as its tool, via a custom `ChatSutraa` adapter. Time-boxed for serverless; **pro** tenant runs the full loop, **free** tenant degrades gracefully. | [deep-research-agent-puce.vercel.app](https://deep-research-agent-puce.vercel.app) |
 
 *More examples coming — each is just a new top-level directory.*
 
@@ -49,9 +50,17 @@ sutraa-examples/
 │   ├── package.json
 │   ├── api/
 │   └── public/
-└── multi-tenant-saas/   ← per-tenant SutraaClient instances, mixed plans
+├── multi-tenant-saas/   ← per-tenant SutraaClient instances, mixed plans
+│   ├── README.md
+│   ├── package.json
+│   ├── api/
+│   └── public/
+└── deep-research-agent/ ← deepagents + ChatSutraa adapter + search tool
     ├── README.md
     ├── package.json
+    ├── vercel.json
+    ├── scripts/
+    ├── lib/
     ├── api/
     └── public/
 ```
@@ -76,6 +85,7 @@ sutraa-examples/
 | `vision` | `.analyze` | `vision.describe`, `vision.ocr` |
 | `tts` | `.speak` | linear PCM @ 22.05 kHz |
 | `embeddings` | `.embed` | batched, order-preserving |
+| `search` | `.web` / `.find` / `.answer` | web search, results or a cited direct answer |
 
 ## License
 

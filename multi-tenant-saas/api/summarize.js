@@ -8,6 +8,13 @@
 // tenants share the platform's own API key (never sent to the browser,
 // read only from the encrypted SUTRAA_API_KEY env var); free tenants get
 // a plain keyless client.
+//
+// IMPORTANT: SutraaClient's constructor falls back to the SUTRAA_API_KEY
+// env var whenever `apiKey` isn't explicitly passed — `new SutraaClient()`
+// is only keyless if that env var is unset for the whole process. In this
+// app SUTRAA_API_KEY *is* set (for the pro tenant below), so free-tier
+// clients must override it explicitly with an empty string to force the
+// anonymous/keyless flow rather than silently inheriting the pro key.
 import { SutraaClient } from "@sutraa/sdk";
 
 const TENANTS = {
@@ -27,7 +34,7 @@ function clientFor(tenantId) {
   const client =
     tenant.plan === "pro" && process.env.SUTRAA_API_KEY
       ? new SutraaClient({ apiKey: process.env.SUTRAA_API_KEY })
-      : new SutraaClient();
+      : new SutraaClient({ apiKey: "" }); // "" forces keyless, overriding env fallback
 
   clients.set(tenantId, client);
   return client;

@@ -46,7 +46,7 @@ function clientFor(tenantId) {
   const { plan } = TENANTS[tenantId];
   const client = plan === "pro"
     ? new SutraaClient({ apiKey: process.env.SUTRAA_API_KEY })
-    : new SutraaClient();
+    : new SutraaClient({ apiKey: "" }); // see "Environment variable precedence" below
   clients.set(tenantId, client);
   return client;
 }
@@ -55,6 +55,20 @@ const res = await clientFor(tenantId).text.generate({ task: "summarize", input: 
 ```
 
 Caching clients by tenant avoids re-establishing device identity or re-parsing configuration on every request, and keeps each tenant's calls attributable to the correct plan.
+
+## Environment variable precedence
+
+`SutraaClient`'s constructor resolves its key as `options.apiKey ?? process.env.SUTRAA_API_KEY`. This means **`new SutraaClient()` is keyless only when `SUTRAA_API_KEY` is unset for the whole process** — in any app where that variable is set for one client (here, the `acme` pro tenant), every other `SutraaClient()` constructed without an explicit key will silently inherit it too.
+
+In a single-tenant app this is usually the behavior you want — it's what lets `configure({ apiKey })` and the env var work interchangeably for the module-level `text`/`reasoning`/etc. functions. In a **multi-tenant** app deliberately mixing plans, it's the opposite of what you want: it collapses your free-tier tenants onto the pro key without any code signaling that it happened.
+
+The fix is to override explicitly for tenants that must stay keyless:
+
+```js
+new SutraaClient({ apiKey: "" }) // empty string is falsy — the SDK skips auth and uses the anonymous flow
+```
+
+`options.apiKey` only falls through to the env var when it is `null`/`undefined` (via `??`); an explicit empty string is preserved and evaluated as "no key" downstream. `null` and `undefined` are **not** safe overrides here — both are nullish and still trigger the env var fallback.
 
 ## Setup & deployment
 

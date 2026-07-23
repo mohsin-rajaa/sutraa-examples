@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reasoning Explorer — @sutraa/sdk</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --panel: #12151c;
+      --ink: #eef1f6;
+      --muted: #8991a3;
+      --accent: #a78bfa;
+      --accent-ink: #1a1030;
+      --trace-bg: #0e1420;
+      --border: #232837;
+      --shadow: 0 10px 40px rgba(0,0,0,.4);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f5fb;
+        --panel: #ffffff;
+        --ink: #1a1c26;
+        --muted: #666d80;
+        --accent: #7c3aed;
+        --accent-ink: #ffffff;
+        --trace-bg: #f6f4fc;
+        --border: #e6e6f2;
+        --shadow: 0 10px 40px rgba(30,20,60,.08);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: ui-sans-serif, "Segoe UI", -apple-system, system-ui, sans-serif;
+      background: var(--bg); color: var(--ink);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .app {
+      width: 100%; max-width: 680px;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 20px; box-shadow: var(--shadow); padding: 28px;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+    p.sub { margin: 0 0 20px; color: var(--muted); font-size: 13.5px; }
+    p.sub code { color: var(--accent); }
+
+    .examples { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .ex-chip {
+      font-size: 12px; padding: 5px 10px; border-radius: 999px;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      cursor: pointer;
+    }
+    .ex-chip:hover { color: var(--accent); border-color: var(--accent); }
+
+    form { display: flex; gap: 10px; }
+    textarea {
+      flex: 1; resize: vertical; min-height: 52px; max-height: 160px;
+      background: var(--bg); color: var(--ink); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 14px; font-size: 14.5px; font-family: inherit;
+      outline: none;
+    }
+    textarea:focus { border-color: var(--accent); }
+    button.go {
+      border: none; background: var(--accent); color: var(--accent-ink);
+      border-radius: 12px; padding: 0 20px; font-size: 14px; font-weight: 700;
+      cursor: pointer; flex-shrink: 0;
+    }
+    button.go:disabled { opacity: .5; cursor: default; }
+
+    .status { margin-top: 14px; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; min-height: 18px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .dot.pro { background: var(--accent); }
+    .dot.free { background: #46c07a; }
+
+    .panel { margin-top: 16px; }
+    .panel h2 {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); margin: 0 0 8px;
+    }
+    .trace {
+      background: var(--trace-bg); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 16px; font-size: 13px; line-height: 1.6; color: var(--muted);
+      white-space: pre-wrap; max-height: 260px; overflow-y: auto; font-family: ui-monospace, monospace;
+    }
+    .answer {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px; font-size: 15px; line-height: 1.6; white-space: pre-wrap;
+    }
+    .error { color: #f28b82; }
+
+    .spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      animation: spin .7s linear infinite; display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    footer { margin-top: 22px; text-align: center; font-size: 11.5px; color: var(--muted); }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>🧠 Reasoning Explorer</h1>
+    <p class="sub">Watch <code>reasoning.generate()</code> think step-by-step before it answers.</p>
+
+    <div class="examples" id="examples"></div>
+
+    <form id="form">
+      <textarea id="input" placeholder="Ask something that needs a few steps of thought…"></textarea>
+      <button class="go" id="go" type="submit">Think</button>
+    </form>
+
+    <div class="status" id="status"></div>
+
+    <div class="panel" id="tracePanel" style="display:none">
+      <h2>Reasoning trace</h2>
+      <div class="trace" id="trace"></div>
+    </div>
+
+    <div class="panel" id="answerPanel" style="display:none">
+      <h2>Answer</h2>
+      <div class="answer" id="answer"></div>
+    </div>
+
+    <footer>powered by <a href="https://www.npmjs.com/package/@sutraa/sdk" target="_blank" rel="noopener">@sutraa/sdk</a> · pro tier</footer>
+  </div>
+
+  <script>
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const goBtn = document.getElementById("go");
+    const statusEl = document.getElementById("status");
+    const tracePanel = document.getElementById("tracePanel");
+    const traceEl = document.getElementById("trace");
+    const answerPanel = document.getElementById("answerPanel");
+    const answerEl = document.getElementById("answer");
+
+    const EXAMPLES = [
+      "Plan a zero-downtime migration for 3 services",
+      "A farmer has chickens and cows totalling 20 heads and 56 legs. How many of each?",
+      "Design a rate limiter for a public API — what are the tradeoffs?",
+    ];
+    const examplesEl = document.getElementById("examples");
+    EXAMPLES.forEach((ex) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "ex-chip";
+      chip.textContent = ex.length > 42 ? ex.slice(0, 42) + "…" : ex;
+      chip.title = ex;
+      chip.addEventListener("click", () => { input.value = ex; input.focus(); });
+      examplesEl.appendChild(chip);
+    });
+
+    function escapeHtml(str) {
+      const d = document.createElement("div");
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const value = input.value.trim();
+      if (!value) return;
+
+      goBtn.disabled = true;
+      tracePanel.style.display = "none";
+      answerPanel.style.display = "none";
+      statusEl.innerHTML = '<span class="spinner"></span> reasoning…';
+
+      try {
+        const res = await fetch("/api/reason", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ input: value }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          statusEl.innerHTML = `<span class="error">error: ${escapeHtml(data.error || "something went wrong")}${data.code ? " (" + data.code + ")" : ""}</span>`;
+          return;
+        }
+
+        const dotClass = data.pro ? "pro" : "free";
+        statusEl.innerHTML = `<span class="dot ${dotClass}"></span> ${data.pro ? "pro tier (API key)" : "keyless free tier"}`;
+
+        if (data.reasoning) {
+          traceEl.textContent = data.reasoning;
+          tracePanel.style.display = "block";
+        }
+        answerEl.textContent = data.output || "(empty answer)";
+        answerPanel.style.display = "block";
+      } catch (err) {
+        statusEl.innerHTML = '<span class="error">Couldn\'t reach the reasoning endpoint.</span>';
+      } finally {
+        goBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "sutraa-reasoning-explorer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Step-by-step reasoning trace viewer built on @sutraa/sdk reasoning.generate (pro tier, API key via env)",
+  "dependencies": {
+    "@sutraa/sdk": "^0.4.0"
+  }
+}

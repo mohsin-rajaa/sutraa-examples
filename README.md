@@ -24,6 +24,7 @@ Each folder in this repo is a **self-contained, runnable project** — clone it,
 |---|---|---|
 | [`pet-chatbot`](./pet-chatbot) | A chatbot with a persistent persona + conversation memory using `text.generate` and `sessions`. Zero-config Vercel deploy (static UI + one serverless function), **no API key**. | [sutraa-pet-chatbot.vercel.app](https://sutraa-pet-chatbot.vercel.app) |
 | [`vision-scanner`](./vision-scanner) | Describe or OCR any public image URL using `vision.analyze`. Same zero-config deploy pattern, surfaces the SDK's typed errors (rate limit / quota / upstream). | [vision-scanner-ten.vercel.app](https://vision-scanner-ten.vercel.app) |
+| [`reasoning-explorer`](./reasoning-explorer) | Step-by-step thinking trace via `reasoning.generate`, on the **pro tier** — `SutraaClient({ apiKey })` with the key held only as an encrypted Vercel env var, never in the repo. | [reasoning-explorer.vercel.app](https://reasoning-explorer.vercel.app) |
 
 *More examples coming — each is just a new top-level directory.*
 
@@ -37,7 +38,12 @@ sutraa-examples/
 │   ├── package.json
 │   ├── api/             ← serverless functions
 │   └── public/          ← static frontend
-└── vision-scanner/      ← vision.analyze (describe + OCR)
+├── vision-scanner/      ← vision.analyze (describe + OCR)
+│   ├── README.md
+│   ├── package.json
+│   ├── api/
+│   └── public/
+└── reasoning-explorer/  ← reasoning.generate, pro tier (API key via env)
     ├── README.md
     ├── package.json
     ├── api/
@@ -49,7 +55,8 @@ sutraa-examples/
 1. Create a new top-level directory: `mkdir my-example`
 2. Make it self-contained (its own `package.json`, README, and code).
 3. Depend on `@sutraa/sdk` and keep the free-tier, keyless flow where possible.
-4. Add a row to the **Examples** table above.
+4. If an example needs an API key (pro tier), **never commit it** — set it as a Vercel environment variable (`vercel env add SUTRAA_API_KEY production`) and read it via `process.env` at request time. See [`reasoning-explorer`](./reasoning-explorer) for the pattern.
+5. Add a row to the **Examples** table above.
 
 ## Capabilities at a glance
 

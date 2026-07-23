@@ -1,0 +1,10 @@
+{
+  "name": "sutraa-multi-tenant-saas",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Multi-tenant SaaS demo: per-tenant SutraaClient instances, mixed free/pro plans",
+  "dependencies": {
+    "@sutraa/sdk": "^0.4.0"
+  }
+}

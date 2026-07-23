@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Tenant SaaS Demo — @sutraa/sdk</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --panel: #ffffff;
+      --ink: #1a1f2b;
+      --muted: #667085;
+      --accent: #2f6fed;
+      --accent-ink: #ffffff;
+      --pro: #f2a24a;
+      --free: #46c07a;
+      --border: #e4e8f0;
+      --shadow: 0 10px 40px rgba(20,30,60,.08);
+      --code-bg: #eef1f8;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1017;
+        --panel: #151a24;
+        --ink: #eef1f6;
+        --muted: #8b93a5;
+        --accent: #5b8cff;
+        --accent-ink: #051229;
+        --pro: #f2a24a;
+        --free: #46c07a;
+        --border: #232a38;
+        --shadow: 0 10px 40px rgba(0,0,0,.4);
+        --code-bg: #1a2030;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: ui-sans-serif, "Segoe UI", -apple-system, system-ui, sans-serif;
+      background: var(--bg); color: var(--ink);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .app {
+      width: 100%; max-width: 720px;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 20px; box-shadow: var(--shadow); padding: 28px;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+    p.sub { margin: 0 0 22px; color: var(--muted); font-size: 13.5px; }
+    p.sub code { color: var(--accent); background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+
+    .tenants { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+    .tenant-card {
+      border: 2px solid var(--border); background: var(--bg); border-radius: 14px;
+      padding: 12px; cursor: pointer; text-align: left; color: var(--ink);
+      display: flex; flex-direction: column; gap: 6px; font-family: inherit;
+    }
+    .tenant-card.active { border-color: var(--accent); }
+    .tenant-card .tname { font-weight: 700; font-size: 13.5px; }
+    .tenant-card .plan-badge {
+      align-self: flex-start; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .04em; padding: 3px 8px; border-radius: 999px; color: #fff;
+    }
+    .plan-badge.pro { background: var(--pro); }
+    .plan-badge.free { background: var(--free); }
+    .tenant-card .count { font-size: 11.5px; color: var(--muted); }
+
+    textarea {
+      width: 100%; resize: vertical; min-height: 110px;
+      background: var(--bg); color: var(--ink); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 14px; font-size: 14.5px; font-family: inherit;
+      outline: none; margin-bottom: 12px;
+    }
+    textarea:focus { border-color: var(--accent); }
+
+    button.go {
+      border: none; background: var(--accent); color: var(--accent-ink);
+      border-radius: 10px; padding: 11px 22px; font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    button.go:disabled { opacity: .5; cursor: default; }
+
+    .status { margin-top: 12px; font-size: 12.5px; color: var(--muted); min-height: 18px; }
+    .error { color: #e05252; }
+
+    .result {
+      margin-top: 14px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; font-size: 14.5px; line-height: 1.55;
+      white-space: pre-wrap; display: none;
+    }
+    .result h2 {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); margin: 0 0 8px;
+    }
+
+    .spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      animation: spin .7s linear infinite; display: inline-block; vertical-align: -2px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    footer { margin-top: 22px; text-align: center; font-size: 11.5px; color: var(--muted); }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>🏢 Multi-Tenant SaaS Demo</h1>
+    <p class="sub">Each tenant gets its own <code>SutraaClient</code> — some pro (API key), some keyless free tier.</p>
+
+    <div class="tenants" id="tenants"></div>
+
+    <textarea id="text" placeholder="Paste some text to summarize on behalf of the selected tenant…"></textarea>
+    <button class="go" id="go">Summarize as tenant</button>
+    <div class="status" id="status"></div>
+
+    <div class="result" id="result">
+      <h2 id="resultLabel">Summary</h2>
+      <div id="resultBody"></div>
+    </div>
+
+    <footer>powered by <a href="https://www.npmjs.com/package/@sutraa/sdk" target="_blank" rel="noopener">@sutraa/sdk</a></footer>
+  </div>
+
+  <script>
+    const TENANTS = [
+      { id: "acme", name: "Acme Corp", plan: "pro" },
+      { id: "hobby", name: "Hobby Dev", plan: "free" },
+      { id: "beta", name: "Beta Startup", plan: "free" },
+    ];
+    const counts = { acme: 0, hobby: 0, beta: 0 };
+    let selected = "acme";
+
+    const tenantsEl = document.getElementById("tenants");
+    const textEl = document.getElementById("text");
+    const goBtn = document.getElementById("go");
+    const statusEl = document.getElementById("status");
+    const resultEl = document.getElementById("result");
+    const resultLabel = document.getElementById("resultLabel");
+    const resultBody = document.getElementById("resultBody");
+
+    function renderTenants() {
+      tenantsEl.innerHTML = "";
+      TENANTS.forEach((t) => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "tenant-card" + (t.id === selected ? " active" : "");
+        card.innerHTML = `
+          <span class="plan-badge ${t.plan}">${t.plan}</span>
+          <span class="tname">${t.name}</span>
+          <span class="count">${counts[t.id]} request${counts[t.id] === 1 ? "" : "s"} this session</span>
+        `;
+        card.addEventListener("click", () => { selected = t.id; renderTenants(); });
+        tenantsEl.appendChild(card);
+      });
+    }
+    renderTenants();
+
+    function escapeHtml(str) {
+      const d = document.createElement("div");
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    goBtn.addEventListener("click", async () => {
+      const text = textEl.value.trim();
+      if (!text) {
+        statusEl.innerHTML = '<span class="error">Paste some text first.</span>';
+        return;
+      }
+      goBtn.disabled = true;
+      resultEl.style.display = "none";
+      statusEl.innerHTML = '<span class="spinner"></span> summarizing as ' + selected + '…';
+
+      try {
+        const res = await fetch("/api/summarize", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ tenantId: selected, text }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          statusEl.innerHTML = `<span class="error">error: ${escapeHtml(data.error || "something went wrong")}${data.code ? " (" + data.code + ")" : ""}</span>`;
+          return;
+        }
+
+        counts[data.tenantId] = data.requestsThisContainer;
+        renderTenants();
+        statusEl.textContent = `served by ${data.tenantName}'s ${data.plan} client`;
+        resultLabel.textContent = `Summary — ${data.tenantName} (${data.plan})`;
+        resultBody.textContent = data.summary || "(empty summary)";
+        resultEl.style.display = "block";
+      } catch (e) {
+        statusEl.innerHTML = '<span class="error">Couldn\'t reach the summarizer.</span>';
+      } finally {
+        goBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -25,6 +25,7 @@ Each folder in this repo is a **self-contained, runnable project** — clone it,
 | [`pet-chatbot`](./pet-chatbot) | A chatbot with a persistent persona + conversation memory using `text.generate` and `sessions`. Zero-config Vercel deploy (static UI + one serverless function), **no API key**. | [sutraa-pet-chatbot.vercel.app](https://sutraa-pet-chatbot.vercel.app) |
 | [`vision-scanner`](./vision-scanner) | Describe or OCR any public image URL using `vision.analyze`. Same zero-config deploy pattern, surfaces the SDK's typed errors (rate limit / quota / upstream). | [vision-scanner-ten.vercel.app](https://vision-scanner-ten.vercel.app) |
 | [`reasoning-explorer`](./reasoning-explorer) | Step-by-step thinking trace via `reasoning.generate`, on the **pro tier** — `SutraaClient({ apiKey })` with the key held only as an encrypted Vercel env var, never in the repo. | [reasoning-explorer.vercel.app](https://reasoning-explorer.vercel.app) |
+| [`multi-tenant-saas`](./multi-tenant-saas) | A mini SaaS with 3 tenants on mixed plans — one **pro** `SutraaClient` (API key), two **keyless free**. Shows cached per-tenant client instances and the multi-tenant pattern the SDK docs describe. | [multi-tenant-saas-zeta.vercel.app](https://multi-tenant-saas-zeta.vercel.app) |
 
 *More examples coming — each is just a new top-level directory.*
 
@@ -43,7 +44,12 @@ sutraa-examples/
 │   ├── package.json
 │   ├── api/
 │   └── public/
-└── reasoning-explorer/  ← reasoning.generate, pro tier (API key via env)
+├── reasoning-explorer/  ← reasoning.generate, pro tier (API key via env)
+│   ├── README.md
+│   ├── package.json
+│   ├── api/
+│   └── public/
+└── multi-tenant-saas/   ← per-tenant SutraaClient instances, mixed plans
     ├── README.md
     ├── package.json
     ├── api/

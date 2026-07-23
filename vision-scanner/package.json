@@ -1,0 +1,10 @@
+{
+  "name": "sutraa-vision-scanner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Image describe + OCR scanner built on @sutraa/sdk vision.analyze (public API test)",
+  "dependencies": {
+    "@sutraa/sdk": "^0.4.0"
+  }
+}

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vision Scanner — @sutraa/sdk</title>
+  <style>
+    :root {
+      --bg: #0f1216;
+      --panel: #171b21;
+      --ink: #eef1f5;
+      --muted: #8b94a3;
+      --accent: #5eead4;
+      --accent-ink: #06231d;
+      --border: #262c35;
+      --shadow: 0 10px 40px rgba(0,0,0,.35);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f6f8;
+        --panel: #ffffff;
+        --ink: #1a1f27;
+        --muted: #667085;
+        --accent: #0f9c8e;
+        --accent-ink: #ffffff;
+        --border: #e4e8ee;
+        --shadow: 0 10px 40px rgba(20,30,50,.08);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: ui-sans-serif, "Segoe UI", -apple-system, system-ui, sans-serif;
+      background: var(--bg); color: var(--ink);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .app {
+      width: 100%; max-width: 620px;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 20px; box-shadow: var(--shadow); padding: 28px;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+    p.sub { margin: 0 0 22px; color: var(--muted); font-size: 13.5px; }
+    p.sub code { color: var(--accent); }
+
+    label { font-size: 12.5px; color: var(--muted); display: block; margin-bottom: 6px; }
+    input[type=text] {
+      width: 100%; background: var(--bg); color: var(--ink);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 11px 13px; font-size: 14px; outline: none;
+    }
+    input[type=text]:focus { border-color: var(--accent); }
+
+    .samples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .sample-chip {
+      font-size: 12px; padding: 5px 10px; border-radius: 999px;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      cursor: pointer;
+    }
+    .sample-chip:hover { color: var(--accent); border-color: var(--accent); }
+
+    .tasks { display: flex; gap: 10px; margin: 18px 0; }
+    .task-btn {
+      flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--ink); cursor: pointer; font-size: 14px;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      transition: border-color .15s, transform .1s;
+    }
+    .task-btn:hover { border-color: var(--accent); }
+    .task-btn:active { transform: scale(.98); }
+    .task-btn .emoji { font-size: 20px; }
+    .task-btn small { color: var(--muted); font-weight: 400; }
+    .task-btn:disabled { opacity: .5; cursor: default; }
+
+    .preview {
+      margin-top: 18px; border: 1px dashed var(--border); border-radius: 14px;
+      overflow: hidden; display: none; background: var(--bg);
+    }
+    .preview img { display: block; width: 100%; max-height: 280px; object-fit: contain; }
+
+    .result {
+      margin-top: 18px; border-radius: 14px; border: 1px solid var(--border);
+      background: var(--bg); padding: 16px; font-size: 14.5px; line-height: 1.55;
+      white-space: pre-wrap; min-height: 60px;
+    }
+    .result .placeholder { color: var(--muted); }
+    .result .badge {
+      display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .03em;
+      text-transform: uppercase; color: var(--accent-ink); background: var(--accent);
+      padding: 3px 8px; border-radius: 999px; margin-bottom: 10px;
+    }
+    .result .error-badge { background: #e05252; color: #fff; }
+
+    .spinner {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      animation: spin .7s linear infinite; display: inline-block; vertical-align: -3px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    footer { margin-top: 20px; text-align: center; font-size: 11.5px; color: var(--muted); }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>🖼️ Vision Scanner</h1>
+    <p class="sub">Describe or read text from any public image URL, via <code>vision.analyze()</code>.</p>
+
+    <label for="url">Image URL</label>
+    <input type="text" id="url" placeholder="https://example.com/photo.jpg" />
+    <div class="samples" id="samples"></div>
+
+    <div class="tasks">
+      <button class="task-btn" id="describeBtn">
+        <span class="emoji">👁️</span> Describe <small>vision.describe</small>
+      </button>
+      <button class="task-btn" id="ocrBtn">
+        <span class="emoji">🔤</span> Read text <small>vision.ocr</small>
+      </button>
+    </div>
+
+    <div class="preview" id="preview"><img id="previewImg" alt="preview" /></div>
+
+    <div class="result" id="result"><span class="placeholder">Paste an image URL and pick a task to see Sutraa's result here.</span></div>
+
+    <footer>powered by <a href="https://www.npmjs.com/package/@sutraa/sdk" target="_blank" rel="noopener">@sutraa/sdk</a></footer>
+  </div>
+
+  <script>
+    const urlInput = document.getElementById("url");
+    const describeBtn = document.getElementById("describeBtn");
+    const ocrBtn = document.getElementById("ocrBtn");
+    const preview = document.getElementById("preview");
+    const previewImg = document.getElementById("previewImg");
+    const result = document.getElementById("result");
+
+    // Wikimedia Commons URLs reliably 502 upstream (their host appears to
+    // reject/blocking the vision fetcher) — stick to permissive direct-image
+    // hosts for samples. See the project README's "gotcha" note.
+    const SAMPLES = [
+      { label: "Wildlife photo", url: "https://httpbin.org/image/jpeg" },
+      { label: "Text image (OCR)", url: "https://dummyimage.com/500x200/222/fff.png&text=Sutraa+SDK+OCR+Test" },
+      { label: "Cat photo", url: "https://http.cat/images/200.jpg" },
+    ];
+
+    const samplesEl = document.getElementById("samples");
+    SAMPLES.forEach((s) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "sample-chip";
+      chip.textContent = s.label;
+      chip.addEventListener("click", () => {
+        urlInput.value = s.url;
+        showPreview(s.url);
+      });
+      samplesEl.appendChild(chip);
+    });
+
+    function showPreview(url) {
+      if (!url) { preview.style.display = "none"; return; }
+      previewImg.src = url;
+      preview.style.display = "block";
+    }
+    urlInput.addEventListener("input", () => showPreview(urlInput.value.trim()));
+
+    function setBusy(busy) {
+      describeBtn.disabled = busy;
+      ocrBtn.disabled = busy;
+    }
+
+    async function run(task) {
+      const url = urlInput.value.trim();
+      if (!url) {
+        result.innerHTML = '<span class="badge error-badge">error</span><div>Paste an image URL first.</div>';
+        return;
+      }
+      showPreview(url);
+      setBusy(true);
+      result.innerHTML = '<span class="spinner"></span> analyzing…';
+      try {
+        const res = await fetch("/api/vision", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url, task }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          result.innerHTML = `<span class="badge error-badge">error</span><div>${escapeHtml(data.error || "Something went wrong.")}</div>`;
+        } else {
+          const label = task === "vision.ocr" ? "extracted text" : "description";
+          result.innerHTML = `<span class="badge">${label}</span><div>${escapeHtml(data.result || "(empty result)")}</div>`;
+        }
+      } catch (e) {
+        result.innerHTML = '<span class="badge error-badge">error</span><div>Couldn\'t reach the scanner. Check your connection.</div>';
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement("div");
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    describeBtn.addEventListener("click", () => run("vision.describe"));
+    ocrBtn.addEventListener("click", () => run("vision.ocr"));
+  </script>
+</body>
+</html>

@@ -23,6 +23,7 @@ Each folder in this repo is a **self-contained, runnable project** — clone it,
 | Project | What it shows | Live demo |
 |---|---|---|
 | [`pet-chatbot`](./pet-chatbot) | A chatbot with a persistent persona + conversation memory using `text.generate` and `sessions`. Zero-config Vercel deploy (static UI + one serverless function), **no API key**. | [sutraa-pet-chatbot.vercel.app](https://sutraa-pet-chatbot.vercel.app) |
+| [`vision-scanner`](./vision-scanner) | Describe or OCR any public image URL using `vision.analyze`. Same zero-config deploy pattern, surfaces the SDK's typed errors (rate limit / quota / upstream). | [vision-scanner-ten.vercel.app](https://vision-scanner-ten.vercel.app) |
 
 *More examples coming — each is just a new top-level directory.*
 
@@ -30,12 +31,17 @@ Each folder in this repo is a **self-contained, runnable project** — clone it,
 
 ```
 sutraa-examples/
-├── README.md          ← you are here
-└── pet-chatbot/       ← one example project, self-contained
+├── README.md            ← you are here
+├── pet-chatbot/         ← text.generate + sessions
+│   ├── README.md
+│   ├── package.json
+│   ├── api/             ← serverless functions
+│   └── public/          ← static frontend
+└── vision-scanner/      ← vision.analyze (describe + OCR)
     ├── README.md
     ├── package.json
-    ├── api/           ← serverless functions
-    └── public/        ← static frontend
+    ├── api/
+    └── public/
 ```
 
 ## Adding a new example

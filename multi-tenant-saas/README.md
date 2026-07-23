@@ -46,7 +46,7 @@ function clientFor(tenantId) {
   const { plan } = TENANTS[tenantId];
   const client = plan === "pro"
     ? new SutraaClient({ apiKey: process.env.SUTRAA_API_KEY })
-    : new SutraaClient({ apiKey: "" }); // see "Environment variable precedence" below
+    : new SutraaClient({ keyless: true }); // see "Environment variable precedence" below
   clients.set(tenantId, client);
   return client;
 }
@@ -62,13 +62,13 @@ Caching clients by tenant avoids re-establishing device identity or re-parsing c
 
 In a single-tenant app this is usually the behavior you want — it's what lets `configure({ apiKey })` and the env var work interchangeably for the module-level `text`/`reasoning`/etc. functions. In a **multi-tenant** app deliberately mixing plans, it's the opposite of what you want: it collapses your free-tier tenants onto the pro key without any code signaling that it happened.
 
-The fix is to override explicitly for tenants that must stay keyless:
+The fix is to force the free tier explicitly for tenants that must stay keyless, using the `keyless` option (added in `@sutraa/sdk` 0.4.1):
 
 ```js
-new SutraaClient({ apiKey: "" }) // empty string is falsy — the SDK skips auth and uses the anonymous flow
+new SutraaClient({ keyless: true }) // ignores apiKey and SUTRAA_API_KEY — always anonymous
 ```
 
-`options.apiKey` only falls through to the env var when it is `null`/`undefined` (via `??`); an explicit empty string is preserved and evaluated as "no key" downstream. `null` and `undefined` are **not** safe overrides here — both are nullish and still trigger the env var fallback.
+On versions before 0.4.1 the equivalent was `new SutraaClient({ apiKey: "" })` — an empty string is falsy so the SDK skips auth, but note that `null`/`undefined` do **not** work there (both are nullish and fall through `??` to the env var). `keyless: true` removes that footgun entirely.
 
 ## Setup & deployment
 

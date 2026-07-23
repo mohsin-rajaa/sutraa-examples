@@ -13,8 +13,9 @@
 // env var whenever `apiKey` isn't explicitly passed — `new SutraaClient()`
 // is only keyless if that env var is unset for the whole process. In this
 // app SUTRAA_API_KEY *is* set (for the pro tenant below), so free-tier
-// clients must override it explicitly with an empty string to force the
-// anonymous/keyless flow rather than silently inheriting the pro key.
+// clients pass `keyless: true` to force the anonymous flow rather than
+// silently inheriting the pro key. (The `keyless` option landed in
+// @sutraa/sdk 0.4.1; on earlier versions the equivalent was `apiKey: ""`.)
 import { SutraaClient } from "@sutraa/sdk";
 
 const TENANTS = {
@@ -34,7 +35,7 @@ function clientFor(tenantId) {
   const client =
     tenant.plan === "pro" && process.env.SUTRAA_API_KEY
       ? new SutraaClient({ apiKey: process.env.SUTRAA_API_KEY })
-      : new SutraaClient({ apiKey: "" }); // "" forces keyless, overriding env fallback
+      : new SutraaClient({ keyless: true }); // force free tier, ignore SUTRAA_API_KEY
 
   clients.set(tenantId, client);
   return client;

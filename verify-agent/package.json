@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A claim-verification agent built only on @sutraa/sdk (reasoning + search + moderate) — no agent framework",
+  "description": "A claim-verification agent built only on @sutraa/sdk (agent.run + search + moderate) — no agent framework",
   "dependencies": {
-    "@sutraa/sdk": "^0.6.0"
+    "@sutraa/sdk": "^0.7.3"
   }
 }

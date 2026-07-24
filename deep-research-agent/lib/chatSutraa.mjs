@@ -1,11 +1,14 @@
 // ChatSutraa — a LangChain chat model backed by @sutraa/sdk.
 //
 // deepagents (like any LangChain tool-calling agent) needs a model that can
-// emit structured tool calls. Sutraa's text/reasoning capabilities return
-// plain text, so this adapter bridges the gap: it renders the conversation +
-// an allowed-tool catalog into a prompt, asks Sutraa to reply with a single
-// strict JSON decision, and parses that back into an AIMessage carrying either
-// `tool_calls` or a final answer — exactly what the agent loop expects.
+// emit structured tool calls. Sutraa's capabilities return plain text (or a
+// parsed JSON decision via structured output), so this adapter bridges the
+// gap: it renders the conversation + an allowed-tool catalog into a prompt,
+// asks Sutraa's dedicated `agent` capability (@sutraa/sdk >=0.7.2 — a model
+// picked server-side for clean tool decisions, so this example doesn't have
+// to choose one) to reply with a single strict JSON decision, and parses that
+// back into an AIMessage carrying either `tool_calls` or a final answer —
+// exactly what the agent loop expects.
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { AIMessage } from "@langchain/core/messages";
 
@@ -47,7 +50,10 @@ export class ChatSutraa extends BaseChatModel {
   constructor(fields) {
     super({});
     this.client = fields.client; // a SutraaClient (pro or keyless)
-    this.useReasoning = fields.useReasoning ?? false;
+    // The dedicated tool-calling capability (@sutraa/sdk >=0.7.2) — fast,
+    // returns clean decisions in `.output`, and sidesteps the `chat` task's
+    // intermittent ~60s hang. Override only if you have a reason to.
+    this.task = fields.task ?? "agent";
     // Only these tool names are offered to the model. Everything else deepagents
     // binds (write_todos, filesystem, …) is intentionally hidden to keep this
     // bounded demo short and reliable; unknown tool calls degrade to a final answer.
@@ -159,8 +165,10 @@ export class ChatSutraa extends BaseChatModel {
       required: ["tool", "args"],
     };
 
-    const api = this.useReasoning ? this.client.reasoning : this.client.text;
-    const res = await api.generate(mustFinish ? { input: prompt } : { input: prompt, schema: decisionSchema });
+    const api = this.client.text;
+    const res = await api.generate(
+      mustFinish ? { input: prompt, task: this.task } : { input: prompt, task: this.task, schema: decisionSchema },
+    );
     const raw = contentToText(res?.output || res?.reasoning || "").trim();
 
     // Prefer the SDK's parsed structured output; fall back to local extraction
@@ -199,7 +207,7 @@ export class ChatSutraa extends BaseChatModel {
         // "thinking" in JSON/meta-commentary despite being told to stop).
         // One plain-prose-only retry is far more reliable than trying to
         // salvage the messy raw text.
-        const res2 = await api.generate({ input: this.#buildFinishPrompt(messages) });
+        const res2 = await api.generate({ input: this.#buildFinishPrompt(messages), task: this.task });
         answer = this.#stripMetaCommentary(contentToText(res2?.output || res2?.reasoning || "").trim());
       }
       message = new AIMessage({ content: String(answer || raw) });

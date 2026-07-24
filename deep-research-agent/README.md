@@ -1,6 +1,6 @@
 # 🔎 Deep Research Agent
 
-A [`deepagents`](https://www.npmjs.com/package/deepagents) (LangChain) research agent whose model **and** tool are both [**@sutraa/sdk**](https://www.npmjs.com/package/@sutraa/sdk) — `reasoning.generate` as the brain, `search.web` as its only tool. Multi-tenant like [`multi-tenant-saas`](../multi-tenant-saas): one tenant on the **pro** tier, one **keyless free**.
+A [`deepagents`](https://www.npmjs.com/package/deepagents) (LangChain) research agent whose model **and** tool are both [**@sutraa/sdk**](https://www.npmjs.com/package/@sutraa/sdk) — the dedicated `agent` task (`text.generate({ task: "agent" })`) as the brain, `search.web` as its only tool. Multi-tenant like [`multi-tenant-saas`](../multi-tenant-saas): one tenant on the **pro** tier, one **keyless free**.
 
 **Live demo → [deep-research-agent-puce.vercel.app](https://deep-research-agent-puce.vercel.app)**
 
@@ -31,9 +31,9 @@ deep-research-agent/
 
 ## Why a custom model is needed
 
-`deepagents` (like any LangChain tool-calling agent) needs a model that can emit structured tool calls. Sutraa's `text`/`reasoning` capabilities return plain text, not a tool-call object — so `ChatSutraa` bridges the gap:
+`deepagents` (like any LangChain tool-calling agent) needs a model that can emit structured tool calls. Sutraa's capabilities return plain text, not a tool-call object — so `ChatSutraa` bridges the gap:
 
-1. It renders the conversation history and an allowed-tool catalog into a single prompt, and (with **@sutraa/sdk ≥ 0.6.0**) passes a JSON **`schema`** for the decision envelope — either `{"tool": "<name>", "args": {...}}` or `{"tool": "finish", "args": {"answer": "..."}}`. The gateway constrains the model to that shape, repairs code fences / stray prose, and recovers the decision from the reasoning trace when `.output` is empty, so `ChatSutraa` just reads the parsed `res.json`.
+1. It renders the conversation history and an allowed-tool catalog into a single prompt, and passes a JSON **`schema`** for the decision envelope — either `{"tool": "<name>", "args": {...}}` or `{"tool": "finish", "args": {"answer": "..."}}` — to Sutraa's dedicated `agent` task (**@sutraa/sdk ≥ 0.7.2**, `stepfun-ai/step-3.7-flash` server-side, chosen so this example doesn't have to pick a model). The gateway constrains the model to that shape, repairs code fences / stray prose, and recovers the decision from the reasoning trace when `.output` is empty, so `ChatSutraa` just reads the parsed `res.json`.
 2. It parses that decision back into a LangChain `AIMessage` carrying either `tool_calls` or final `content` — the shape `deepagents` expects.
 
 > **Not using a framework?** The SDK ships a built-in tool-calling loop — `sutraa.agent.run({ input, tools, maxSteps })` — that does all of the above (decide → call → observe → repeat) for you, returning `{ output, steps, usage }`. `ChatSutraa` exists specifically to plug Sutraa into LangChain/`deepagents`; for a standalone agent, reach for `agent.run` instead.
@@ -50,12 +50,12 @@ export class ChatSutraa extends BaseChatModel {
 }
 ```
 
-### Reasoning models "think out loud" — plan for it
+### Belt-and-braces for messy model replies
 
-Two behaviors showed up repeatedly while wiring a reasoning-tuned model into a strict tool-calling protocol, and the adapter accounts for both:
+The `agent` task's model returns clean schema-constrained JSON on `.output` directly, but `ChatSutraa` keeps two fallbacks that mattered when this example ran on a reasoning-tuned model (and still guard against an off-label `task` override):
 
-- **The JSON decision often lands in `.reasoning`, not `.output`.** When the task is "decide the next action" rather than "give the final answer," the model tends to treat that decision as part of its thinking. `ChatSutraa` reads `res.output || res.reasoning`.
-- **It doesn't always stop when told to finish.** On a forced-finish turn it can keep emitting meta-commentary or another tool-shaped JSON blob instead of a clean answer. The adapter detects this (no usable `.answer` on a forced-finish turn) and retries once with a plain-prose-only prompt, then strips any leftover "We need to…" / "Let's…" lead-in as a last-resort cleanup.
+- **Reading `.reasoning` if `.output` is empty.** Some models put a "decide the next action" answer into their thinking trace instead of the reply body. `ChatSutraa` reads `res.output || res.reasoning`.
+- **A plain-prose retry if the forced-finish turn doesn't yield a clean answer.** The adapter detects this (no usable `.answer` on a forced-finish turn) and retries once with a plain-prose-only prompt, then strips any leftover "We need to…" / "Let's…" lead-in as a last-resort cleanup.
 
 ## Time-boxing an agent loop on serverless
 

@@ -110,14 +110,12 @@ export async function POST(req) {
       ? new SutraaClient({ apiKey: process.env.SUTRAA_API_KEY, maxRetries: 0 })
       : new SutraaClient({ keyless: true, maxRetries: 0 });
 
-  // reasoning.generate, not text.generate: isolated testing (api/diag.mjs,
-  // not shipped) showed text.generate consistently hanging to Sutraa's ~60s
-  // gateway ceiling for this key/environment, while reasoning.generate
-  // returns in ~1-3s for the same prompts. reasoning is also a better fit
-  // thematically — it's what actually powers each planning/tool-call step.
+  // task defaults to "agent" (@sutraa/sdk >=0.7.2): a dedicated tool-calling
+  // capability (stepfun-ai/step-3.7-flash), verified live at ~4s per
+  // decision round with clean JSON on `.output` — faster than the old
+  // reasoning-task workaround and avoids the `chat` task's ~60s hang.
   const model = new ChatSutraa({
     client,
-    useReasoning: true,
     exposeTools: ["web_search"],
     maxToolCalls: MAX_TOOL_CALLS,
   });

@@ -8,7 +8,7 @@
     "postinstall": "node scripts/fix-vendored-esm.mjs"
   },
   "dependencies": {
-    "@sutraa/sdk": "^0.6.0",
+    "@sutraa/sdk": "^0.7.2",
     "deepagents": "^1.11.1",
     "@langchain/core": "^1.2.0",
     "@langchain/langgraph": "^1.4.4",

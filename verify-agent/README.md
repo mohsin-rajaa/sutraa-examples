@@ -1,6 +1,6 @@
 # 🕵️ Verify Agent
 
-A claim-verification agent built **only** on [**@sutraa/sdk**](https://www.npmjs.com/package/@sutraa/sdk) — no LangChain, no `deepagents`, no agent framework at all. `reasoning`, `search`, and `moderate` are used directly as the agent's tools.
+A claim-verification agent built **only** on [**@sutraa/sdk**](https://www.npmjs.com/package/@sutraa/sdk) — no LangChain, no `deepagents`, no agent framework at all. The SDK's own `agent.run()` tool-calling loop (≥0.7.0) drives it; `search` is its only tool, `moderate` runs alongside as a safety check.
 
 **Live demo → [verify-agent-six.vercel.app](https://verify-agent-six.vercel.app)**
 
@@ -8,17 +8,16 @@ A claim-verification agent built **only** on [**@sutraa/sdk**](https://www.npmjs
 
 Give it a claim; it returns a verdict (`true` / `false` / `partially-true` / `unverifiable`) with a confidence score, an explanation, and cited sources — plus a moderation flag if the claim itself trips content-safety checks.
 
-Unlike [`deep-research-agent`](../deep-research-agent), this is **not** an open-ended agent loop. It's a fixed, 3-step pipeline:
+Unlike [`deep-research-agent`](../deep-research-agent) (which brings its own tool-calling adapter for LangChain), this example doesn't hand-roll any agent logic at all:
 
 ```
-decompose claim → 2 sub-questions
-       ↓
-gather evidence (search.answer, run in parallel) + moderate.check (in parallel)
-       ↓
-synthesize verdict (reasoning, grounded only in the gathered evidence)
+agent.run({ input: claim, tools: { web_search }, maxSteps: 2 })
+       ↓ (the model decides how many searches it needs, up to 2)
+       ↓ moderate.check(claim) runs in parallel
+final answer = verdict JSON, parsed from result.output
 ```
 
-Bounding the pipeline by construction — rather than letting a model decide when to stop — sidesteps most of what made `deep-research-agent` hard: no recursion limit tuning, no wall-clock/hard-stop guard, no framework dependency, no packaging issues. The whole agent is one ~90-line file with a single dependency.
+`agent.run` already is the bounded decide → call → observe loop; `maxSteps: 2` caps it at two searches before it's forced to answer. No recursion limit tuning, no wall-clock/hard-stop guard, no framework dependency, no packaging issues. The whole agent is one ~85-line file with a single dependency.
 
 ## Project structure
 
@@ -34,36 +33,35 @@ verify-agent/
 ## Implementation
 
 ```js
-import { configure, reasoning, search, moderate } from "@sutraa/sdk";
+import { configure, agent, search, moderate } from "@sutraa/sdk";
 configure({ apiKey: process.env.SUTRAA_API_KEY, maxRetries: 0 });
 
-// 1. decompose
-const { questions } = await think(`Claim: "${claim}"\nList up to 2 searchable sub-questions...`);
+const webSearch = {
+  description: "Search the web for a cited, synthesized answer to a sub-question about the claim.",
+  parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+  run: async ({ query }) => {
+    const { answer, sources } = await search.answer({ query });
+    return { answer, sources: (sources ?? []).map((s) => s.url) };
+  },
+};
 
-// 2. gather evidence + moderate, in parallel
-const [evidence, mod] = await Promise.all([
-  Promise.all(questions.map((q) => search.answer({ query: q }))),
+const [result, mod] = await Promise.all([
+  agent.run(
+    { input: `Claim to verify: "${claim}"`, system: SYSTEM, tools: { web_search: webSearch }, maxSteps: 2 },
+    { timeoutMs: 45_000 },
+  ),
   moderate.check({ input: claim }),
 ]);
 
-// 3. synthesize, grounded only in the evidence text
-const verdict = await think(`Claim: "${claim}"\nEvidence:\n${evidenceText}\nRespond with ONLY this JSON: {...}`);
+// SYSTEM instructs the model to finish with ONLY the verdict JSON as its answer.
+const verdict = extractJson(result.output);
 ```
 
-`search.answer` does most of the heavy lifting here — it returns an already-synthesized, cited answer per sub-question, so the pipeline doesn't need to fetch raw search results and get a model to summarize them itself (which is both an extra round-trip and an extra place for things to go wrong).
+`search.answer` does most of the heavy lifting for each tool call — it returns an already-synthesized, cited answer per sub-question, so `web_search`'s handler doesn't need to fetch raw results and get a model to summarize them itself. `agent.run` owns the decide → search → observe loop entirely: the model chooses its own queries (up to `maxSteps: 2`), and `result.steps` gives back every `web_search` call and result for the evidence trail, exactly like the old hand-rolled pipeline did.
 
-## `reasoning.generate` as a JSON-only function
+## The final answer is still just text — parse it
 
-Every `think()` call asks for **one JSON object and nothing else**, and reads it defensively:
-
-```js
-async function think(prompt) {
-  const res = await reasoning.generate({ input: prompt });
-  return extractJson(res?.output || res?.reasoning || "");
-}
-```
-
-The `res.output || res.reasoning` fallback matters: for a "decide/produce structured output" task (as opposed to "answer a question in prose"), the model sometimes puts its JSON into `.reasoning` (its thinking trace) and leaves `.output` empty. Reading both, with `.output` preferred, covers both cases. Unlike `deep-research-agent`'s adapter, there's no "must finish now" branch to get wrong here — each `think()` call has exactly one unambiguous job, which avoids the meta-commentary/stalling behavior that showed up when a model was mid-loop and told to stop calling tools.
+`agent.run`'s `result.output` is the model's final answer as plain text; there's no schema on the *finish* step, only on each tool-call decision. The `SYSTEM` prompt tells the model its final answer must be nothing but the verdict JSON, and `extractJson` reads it defensively (first balanced `{...}` in the string) in case anything else leaks in. This is the one place this example still hand-rolls JSON extraction — everything upstream of it (the tool-call envelope, the reasoning-trace fallback, the "must finish now" forcing) is handled inside `agent.run` itself.
 
 ## Setup & deployment
 
@@ -73,7 +71,7 @@ vercel env add SUTRAA_API_KEY production
 vercel deploy --prod
 ```
 
-No key needed to run — `verify.js` only calls `configure()` if `SUTRAA_API_KEY` is set, so it falls back to the keyless free tier automatically. Free-tier limits apply per the usual constraints (this pipeline makes 4 upstream calls per request — 2 reasoning, 1 search fan-out of 2, 1 moderate — so it will hit rate limits faster than a single-call example).
+No key needed to run — `verify.js` only calls `configure()` if `SUTRAA_API_KEY` is set, so it falls back to the keyless free tier automatically. Free-tier limits apply per the usual constraints (this run makes up to 4 upstream calls — up to 2 tool-decision rounds each backed by a model call, up to 2 `search.answer` calls, 1 `moderate.check` — so it will hit rate limits faster than a single-call example).
 
 ## API
 
@@ -94,5 +92,5 @@ No key needed to run — `verify.js` only calls `configure()` if `SUTRAA_API_KEY
 
 ## What was skipped
 
-- **No re-query loop.** If the first evidence pass is thin, the agent doesn't search again — it verdicts on what it has (and the prompt allows `"unverifiable"` as an honest answer). Add a bounded retry (e.g. one more `search.answer` round if `confidence < 50`) if that matters for your use case.
-- **No per-call timeout.** The SDK has no `AbortSignal`/timeout option, and this pipeline doesn't add its own — each request currently takes ~60-70s (two sequential `reasoning` calls bracketing a parallel `search.answer` fan-out, and `search.answer`'s own citation synthesis is the main cost). If you need a hard ceiling, wrap the handler in the same `Promise.race`-against-a-timer pattern `deep-research-agent` uses.
+- **No re-query loop beyond `maxSteps: 2`.** The model can already choose to search once, twice, or not at all — but once it's forced to finish at 2 rounds, it verdicts on what it has (and the prompt allows `"unverifiable"` as an honest answer) rather than retrying with a different query. Raise `maxSteps` if that matters for your use case.
+- **The run-level timeout (`timeoutMs: 45_000`) is a soft budget, not a hard `Promise.race` guard** like `deep-research-agent` uses. `agent.run` aborts and rejects once its internal deadline passes, which is enough here since there's no multi-stage LangGraph loop to bound on top of it.

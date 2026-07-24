@@ -33,7 +33,7 @@ verify-agent/
 ## Implementation
 
 ```js
-import { configure, agent, search, moderate } from "@sutraa/sdk";
+import { configure, agent, text, search, moderate } from "@sutraa/sdk";
 configure({ apiKey: process.env.SUTRAA_API_KEY, maxRetries: 0 });
 
 const webSearch = {
@@ -46,22 +46,27 @@ const webSearch = {
 };
 
 const [result, mod] = await Promise.all([
-  agent.run(
-    { input: `Claim to verify: "${claim}"`, system: SYSTEM, tools: { web_search: webSearch }, maxSteps: 2 },
-    { timeoutMs: 45_000 },
-  ),
+  agent.run({ input: `Claim to verify: "${claim}"`, system: SYSTEM, tools: { web_search: webSearch }, maxSteps: 2 }),
   moderate.check({ input: claim }),
 ]);
 
-// SYSTEM instructs the model to finish with ONLY the verdict JSON as its answer.
-const verdict = extractJson(result.output);
+// result.output is a prose verdict write-up (SYSTEM asks for one) — extract it
+// into the JSON shape the frontend renders with one fast structured call.
+const extracted = await text.generate({
+  input: `Extract the verdict as JSON from this analysis:\n\n${result.output}`,
+  task: "agent",
+  schema: VERDICT_SCHEMA,
+});
+const verdict = extracted.json ?? extractJson(extracted.output);
 ```
 
 `search.answer` does most of the heavy lifting for each tool call — it returns an already-synthesized, cited answer per sub-question, so `web_search`'s handler doesn't need to fetch raw results and get a model to summarize them itself. `agent.run` owns the decide → search → observe loop entirely: the model chooses its own queries (up to `maxSteps: 2`), and `result.steps` gives back every `web_search` call and result for the evidence trail, exactly like the old hand-rolled pipeline did.
 
-## The final answer is still just text — parse it
+## The final answer is still just text — extract it, don't ask the loop to emit JSON
 
-`agent.run`'s `result.output` is the model's final answer as plain text; there's no schema on the *finish* step, only on each tool-call decision. The `SYSTEM` prompt tells the model its final answer must be nothing but the verdict JSON, and `extractJson` reads it defensively (first balanced `{...}` in the string) in case anything else leaks in. This is the one place this example still hand-rolls JSON extraction — everything upstream of it (the tool-call envelope, the reasoning-trace fallback, the "must finish now" forcing) is handled inside `agent.run` itself.
+`agent.run`'s `result.output` is the model's final answer as **plain text**; there's no schema on the *finish* step, only on each tool-call decision (and not at all on a forced finish, which this example hits often since it only allows 2 tool rounds). Asking the model to make that free-text answer *itself* be raw JSON turned out unreliable in practice — nested "your prose reply must secretly be a JSON string" instructions are exactly the kind of thing forced/schema-less turns ignore.
+
+The reliable fix: let `agent.run` produce a normal prose verdict, then make one **separate, single-shot structured call** — `text.generate({ schema })`, same fast `agent` model — to extract `{ verdict, confidence, explanation, sources }` from that prose. A schema-constrained call is reliable from a cold start (no forced/unforced distinction to fall into); a schema-constrained *field inside* a free-text agent answer is not. This is the one place this example still needs an explicit JSON-extraction step — everything about the tool-call loop itself (envelope, reasoning-trace fallback, forced-finish handling) stays inside `agent.run`.
 
 ## Setup & deployment
 
@@ -93,4 +98,4 @@ No key needed to run — `verify.js` only calls `configure()` if `SUTRAA_API_KEY
 ## What was skipped
 
 - **No re-query loop beyond `maxSteps: 2`.** The model can already choose to search once, twice, or not at all — but once it's forced to finish at 2 rounds, it verdicts on what it has (and the prompt allows `"unverifiable"` as an honest answer) rather than retrying with a different query. Raise `maxSteps` if that matters for your use case.
-- **The run-level timeout (`timeoutMs: 45_000`) is a soft budget, not a hard `Promise.race` guard** like `deep-research-agent` uses. `agent.run` aborts and rejects once its internal deadline passes, which is enough here since there's no multi-stage LangGraph loop to bound on top of it.
+- **No `timeoutMs` on the `agent.run` call, deliberately.** `search.answer`'s own citation synthesis can take 20-40s per call, so a tight internal budget aborted runs that would otherwise finish fine (verified live: a real 2-search claim needs close to 60s end to end). Vercel's `maxDuration` is the actual backstop, same tradeoff the original hand-rolled pipeline made — the SDK's `{ timeoutMs, signal }` controls are still there and worth using once you've measured your own tools' latency; they just don't fit *this* example's already-slow tool well without a Pro plan's longer `maxDuration`.

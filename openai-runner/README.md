@@ -7,7 +7,7 @@ import { serve } from "@sutraa/sdk";
 export default serve();
 ```
 
-**Live demo → [sutraa-openai-runner.vercel.app](https://sutraa-openai-runner.vercel.app)**
+**Live demo → [openai-runner-psi.vercel.app](https://openai-runner-psi.vercel.app)**
 
 ## Overview
 

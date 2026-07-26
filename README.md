@@ -28,6 +28,7 @@ Each folder in this repo is a **self-contained, runnable project** — clone it,
 | [`multi-tenant-saas`](./multi-tenant-saas) | A mini SaaS with 3 tenants on mixed plans — one **pro** `SutraaClient` (API key), two **keyless free**. Shows cached per-tenant client instances and the multi-tenant pattern the SDK docs describe. | [multi-tenant-saas-zeta.vercel.app](https://multi-tenant-saas-zeta.vercel.app) |
 | [`deep-research-agent`](./deep-research-agent) | A [`deepagents`](https://www.npmjs.com/package/deepagents) (LangChain) research agent powered end-to-end by Sutraa — `reasoning.generate` as the model, `search.web` as its tool, via a custom `ChatSutraa` adapter. Time-boxed for serverless; **pro** tenant runs the full loop, **free** tenant degrades gracefully. | [deep-research-agent-puce.vercel.app](https://deep-research-agent-puce.vercel.app) |
 | [`verify-agent`](./verify-agent) | A claim-verification agent built with **no agent framework** — just `reasoning`, `search`, and `moderate` used directly as tools in a bounded 3-step pipeline (decompose → gather evidence → verdict). ~90 lines, one dependency. | [verify-agent-six.vercel.app](https://verify-agent-six.vercel.app) |
+| [`openai-runner`](./openai-runner) | The whole backend is `export default serve();` — an OpenAI-compatible API (`/v1/chat/completions`, `/v1/responses`, `/v1/models`, `/v1/embeddings`, streaming) any OpenAI client can use via `OPENAI_BASE_URL`, no OpenAI/Anthropic/Gemini key. Page includes a live streaming chat demo. | [sutraa-openai-runner.vercel.app](https://sutraa-openai-runner.vercel.app) |
 
 *More examples coming — each is just a new top-level directory.*
 
@@ -64,9 +65,15 @@ sutraa-examples/
 │   ├── lib/
 │   ├── api/
 │   └── public/
-└── verify-agent/        ← no framework — reasoning/search/moderate as tools
+├── verify-agent/        ← no framework — reasoning/search/moderate as tools
+│   ├── README.md
+│   ├── package.json
+│   ├── api/
+│   └── public/
+└── openai-runner/       ← serve() — an OpenAI-compatible API, zero config
     ├── README.md
     ├── package.json
+    ├── vercel.json
     ├── api/
     └── public/
 ```

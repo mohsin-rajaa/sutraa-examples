@@ -1,0 +1,13 @@
+{
+  "name": "sutraa-openai-runner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "An OpenAI-compatible API backed by @sutraa/sdk's serve() Runner — point Claude Code, Cline, Open WebUI, or the openai SDK at it via OPENAI_BASE_URL.",
+  "scripts": {
+    "dev": "node api/index.js"
+  },
+  "dependencies": {
+    "@sutraa/sdk": "^0.8.0"
+  }
+}

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sutraa Runner — an OpenAI-compatible API, zero config</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --ink: #16181d;
+      --muted: #6b7280;
+      --accent: #4f46e5;
+      --accent-soft: #eeecfd;
+      --bot-bubble: #eef0f4;
+      --user-bubble: #4f46e5;
+      --border: #e5e7eb;
+      --code-bg: #101218;
+      --code-ink: #d7dae2;
+      --shadow: 0 10px 40px rgba(20, 20, 40, 0.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e0f13;
+        --panel: #16181f;
+        --ink: #eef0f4;
+        --muted: #9aa0ac;
+        --accent: #8b85f5;
+        --accent-soft: #232047;
+        --bot-bubble: #23262f;
+        --user-bubble: #6a63e8;
+        --border: #2a2d37;
+        --code-bg: #0a0b0f;
+        --code-ink: #cfd3dc;
+        --shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      display: flex;
+      justify-content: center;
+      padding: 32px 16px 64px;
+    }
+    main { width: 100%; max-width: 640px; }
+    h1 { font-size: 26px; margin: 0 0 6px; }
+    .sub { color: var(--muted); margin: 0 0 28px; line-height: 1.5; }
+    .sub a { color: var(--accent); }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 20px 22px;
+      margin-bottom: 20px;
+    }
+    section h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 14px; }
+    pre {
+      background: var(--code-bg); color: var(--code-ink);
+      border-radius: 10px; padding: 14px 16px; overflow-x: auto;
+      font-size: 13px; line-height: 1.6; margin: 0;
+    }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .chat { display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; margin-bottom: 14px; scroll-behavior: smooth; }
+    .row { display: flex; max-width: 88%; }
+    .row.user { align-self: flex-end; }
+    .bubble { padding: 10px 14px; border-radius: 14px; font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+    .row.bot .bubble { background: var(--bot-bubble); border-bottom-left-radius: 4px; }
+    .row.user .bubble { background: var(--user-bubble); color: #fff; border-bottom-right-radius: 4px; }
+    .row.error .bubble { background: #fdecea; color: #b23b2e; }
+
+    form { display: flex; gap: 8px; }
+    input[type=text] {
+      flex: 1; border: 1px solid var(--border); background: var(--bg); color: var(--ink);
+      border-radius: 999px; padding: 11px 16px; font-size: 14.5px; outline: none;
+    }
+    input[type=text]:focus { border-color: var(--accent); }
+    button.send {
+      border: none; background: var(--accent); color: #fff; padding: 0 18px;
+      border-radius: 999px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    button.send:disabled { opacity: .5; cursor: default; }
+    footer { text-align: center; font-size: 12px; color: var(--muted); }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Sutraa Runner</h1>
+    <p class="sub">An OpenAI-compatible API deployed with <a href="https://www.npmjs.com/package/@sutraa/sdk" target="_blank" rel="noopener"><code>@sutraa/sdk</code></a>'s <code>serve()</code> — the whole backend is <code>export default serve();</code>. No OpenAI, Anthropic, or Gemini key; Sutraa's free tier answers every request below.</p>
+
+    <section>
+      <h2>Point any OpenAI-compatible client here</h2>
+      <pre><code id="setup-snippet">export OPENAI_BASE_URL="…"
+export OPENAI_API_KEY="anything"   # unused — the free tier just works</code></pre>
+    </section>
+
+    <section>
+      <h2>Try it — streamed via <code>/v1/chat/completions</code></h2>
+      <div class="chat" id="chat"></div>
+      <form id="form">
+        <input type="text" id="msg" placeholder="Ask it anything…" autocomplete="off" />
+        <button class="send" id="send" type="submit">Send</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Or curl it directly</h2>
+      <pre><code id="curl-snippet"></code></pre>
+    </section>
+
+    <footer>source: <a href="https://github.com/mohsin-rajaa/sutraa-examples/tree/main/openai-runner" target="_blank" rel="noopener">sutraa-examples/openai-runner</a> · powered by <a href="https://www.npmjs.com/package/@sutraa/sdk" target="_blank" rel="noopener">@sutraa/sdk</a></footer>
+  </main>
+
+  <script>
+    const base = location.origin;
+    document.getElementById("setup-snippet").textContent =
+      `export OPENAI_BASE_URL="${base}/v1"\nexport OPENAI_API_KEY="anything"   # unused — the free tier just works`;
+    document.getElementById("curl-snippet").textContent =
+`curl ${base}/v1/chat/completions \\
+  -H "content-type: application/json" \\
+  -d '{"messages":[{"role":"user","content":"Say hi in five words"}]}'`;
+
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("form");
+    const input = document.getElementById("msg");
+    const sendBtn = document.getElementById("send");
+    const history = [];
+
+    function addRow(role, text) {
+      const row = document.createElement("div");
+      row.className = "row " + role;
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      chat.scrollTop = chat.scrollHeight;
+      return bubble;
+    }
+
+    async function send(message) {
+      addRow("user", message);
+      input.value = "";
+      sendBtn.disabled = true;
+      const bubble = addRow("bot", "");
+      try {
+        const res = await fetch("/v1/chat/completions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ stream: true, messages: [...history, { role: "user", content: message }] }),
+        });
+        if (!res.ok || !res.body) {
+          const data = await res.json().catch(() => ({}));
+          bubble.parentElement.className = "row error";
+          bubble.textContent = data?.error?.message || "Something went wrong.";
+          return;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let full = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.startsWith("data:")) continue;
+            const data = line.slice(5).trim();
+            if (data === "[DONE]") continue;
+            try {
+              const delta = JSON.parse(data).choices?.[0]?.delta?.content;
+              if (delta) {
+                full += delta;
+                bubble.textContent = full;
+                chat.scrollTop = chat.scrollHeight;
+              }
+            } catch {}
+          }
+        }
+        history.push({ role: "user", content: message }, { role: "assistant", content: full });
+      } catch (e) {
+        bubble.parentElement.className = "row error";
+        bubble.textContent = "Couldn't reach the Runner. Check your connection.";
+      } finally {
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const message = input.value.trim();
+      if (message) send(message);
+    });
+
+    addRow("bot", "This reply is streaming straight from POST /v1/chat/completions. Ask me something!");
+    input.focus();
+  </script>
+</body>
+</html>
